@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.IO;
 using static System.Console;
+using static System.Convert;
 
 namespace CSProject
 {
@@ -12,6 +13,81 @@ namespace CSProject
     {
         static void Main(string[] args)
         {
+            List<Staff> myStaff;
+            FileReader fr = new FileReader();
+            int month = 0;
+            int year = 0;
+
+            //Get the year to process
+            while (year == 0)
+            {
+                Write("\nPlease enter the year: ");
+
+                try
+                {
+                    year = ToInt32(ReadLine());
+
+                    if (year < 2000 || year > 2100)
+                    {
+                        year = 0;
+                        WriteLine("Year is out of range.");
+                    }
+                }
+                catch (FormatException e)
+                {
+                    WriteLine("Error entering year: {0}", e.Message);
+                }
+            }
+
+            //Get the month to process
+            while (month == 0)
+            {
+                Write("\nPlease enter the month: ");
+
+                try
+                {
+                    month = ToInt32(ReadLine());
+
+                    if (month < 1 || month > 12)
+                    {
+                        month = 0;
+                        WriteLine("Please enter a value between 1 and 12.");
+                    }
+                }
+                catch (FormatException e)
+                {
+                    WriteLine("Error entering month: {0}", e.Message);
+                }
+            }
+
+            myStaff = fr.ReadFile();
+            for (int i = 0; i < myStaff.Count; i++)
+            {
+                try
+                {
+                    //Retrieve the hours worked for the current staff
+                    Write("\nEnter hours worked for {0}: ", myStaff[i].NameOfStaff);
+                    myStaff[i].HoursWorked = ToInt32(ReadLine());
+
+                    //Calculate the pay and write it to the screen
+                    myStaff[i].CalculatePay();
+                    WriteLine(myStaff[i].ToString());
+                }
+                catch (Exception e)
+                {
+                    WriteLine("Error entering hours: {0}", e.Message);
+                    //Decrement the counter so we process the same staff again
+                    i--;
+                }
+            }
+
+            //Create a pay slip object to output the pay slips and summary
+            PaySlip ps = new PaySlip(month, year);
+            ps.GeneratePaySlip(myStaff);
+            ps.GenerateSummary(myStaff);
+
+            WriteLine("Payroll complete. Press any key to continue.");
+            ReadKey();
         }
     }
 
@@ -22,9 +98,12 @@ namespace CSProject
         private int hWorked;
 
         //Properties
+        //This class and its subclasses can set TotalPay
         public float TotalPay { get; protected set; }
+        //Only this class can set BasicPay and NameOfStaff
         public float BasicPay { get; private set; }
         public string NameOfStaff { get; private set; }
+
         public int HoursWorked
         {
             get
@@ -72,6 +151,7 @@ namespace CSProject
         private const float managerHourlyRate = 50;
 
         //Properties
+        //Only this class can set the Allowance
         public int Allowance { get; private set; }
 
         //Constructor
@@ -88,7 +168,7 @@ namespace CSProject
 
             Allowance = 1000;
             if (HoursWorked > 160)
-                TotalPay += Allowance;
+                TotalPay = BasicPay + Allowance;
         }
 
         public override string ToString()
@@ -105,6 +185,7 @@ namespace CSProject
         private const float adminHourlyRate = 30f;
 
         //Properties
+        //Only this class can set Overtime
         public float Overtime { get; private set; }
 
         //Constructor
@@ -122,7 +203,7 @@ namespace CSProject
             if (HoursWorked > 160)
             {
                 Overtime = overtimeRate * (HoursWorked - 160);
-                TotalPay += Overtime;
+                TotalPay = BasicPay + Overtime;
             }
         }
 
@@ -150,7 +231,7 @@ namespace CSProject
                     {
                         //Read a line from the file, storing the name in the first array element,
                         //and the position in the second element.
-                        result = sr.ReadLine().Split(separator, StringSplitOptions.None);
+                        result = sr.ReadLine().Split(separator, StringSplitOptions.RemoveEmptyEntries);
 
                         //Check the position, and add the appropriate Staff object to the list.
                         if (result[1] == "Manager")
@@ -192,6 +273,8 @@ namespace CSProject
         {
             string path;
 
+            WriteLine("Generating pay slips...");
+
             foreach (Staff f in myStaff)
             {
                 path = f.NameOfStaff + ".txt";
@@ -225,6 +308,40 @@ namespace CSProject
                     sw.Close();
                 }
             }
+        }
+
+        public void GenerateSummary(List<Staff> myStaff)
+        {
+            string path = "summary.txt";
+
+            WriteLine("Generating summary...");
+
+            //Retrieve a list of staff with less than 10 hours.
+            var result =
+                from st in myStaff
+                where st.HoursWorked < 10
+                orderby st.NameOfStaff
+                select new { st.NameOfStaff, st.HoursWorked };
+
+            using (StreamWriter sw = new StreamWriter(path, true))
+            {
+                sw.WriteLine("Staff with less than 10 working hours for {0} {1}", (MonthsOfYear) month, year);
+                sw.WriteLine("");
+
+                foreach (var f in result)
+                {
+                    sw.WriteLine("Name of Staff: {0}, Hours Worked: {1}", f.NameOfStaff, f.HoursWorked);
+                }
+                sw.WriteLine(new String('=', 25));
+
+                sw.Close();
+            }
+        }
+
+        public override string ToString()
+        {
+            return "\nMonth = " + (MonthsOfYear) month
+                + "\nYear = " + year;
         }
     }
 }
